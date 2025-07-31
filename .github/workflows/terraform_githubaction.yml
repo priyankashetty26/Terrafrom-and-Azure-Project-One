@@ -1,0 +1,60 @@
+name: 'Terraform'
+
+on:
+  #Enables manual trigger from the Actions tab in GitHub
+  workflow_dispatch:
+  #Triggers the workflow on push events to the main branch, but only if the changes affect files in the TerraformTest/ directory (or subdirectories).
+  push:
+    branches:
+      - main
+    paths:
+      - TerraformTest/**
+  #Triggers the workflow on pull request to the main branch, but only if the changes affect files in the TerraformTest/ directory (or subdirectories).
+  pull_request:
+    branches:
+      - main
+    paths:
+      - TerraformTest/**
+
+permissions:
+  contents: read
+
+jobs:
+  terraform:
+    name: 'Terraform'
+    runs-on: ubuntu-latest
+
+    # Use the Bash shell regardless whether the GitHub Actions runner is ubuntu-latest, macos-latest, or windows-latest
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+    # Checkout the repository to the GitHub Actions runner
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    #Azure login
+    - name: azure/login@v2
+      with:
+        creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+    # Install the latest version of Terraform CLI and configure the Terraform CLI configuration file with a Terraform Cloud user API token
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
+    - name: Terraform Init
+      run: terraform -chdir=TerraformTest init
+
+    # Checks that all Terraform configuration files adhere to a canonical format
+    - name: Terraform Format
+      run: terraform fmt -check -recursive
+
+    # Generates an execution plan for Terraform
+    - name: Terraform Plan
+      run: terraform -chdir=TerraformTest plan
+
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/"main"' && github.event_name == 'push'
+      run: terraform apply -chdir=TerraformTest -auto-approve
